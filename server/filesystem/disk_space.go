@@ -1,12 +1,13 @@
 package filesystem
 
 import (
-	"github.com/apex/log"
-	"github.com/karrick/godirwalk"
+	"os"
+	"path/filepath"
 	"sync"
 	"sync/atomic"
-	"syscall"
 	"time"
+
+	"github.com/apex/log"
 )
 
 type SpaceCheckingOpts struct {
@@ -162,31 +163,41 @@ func (fs *Filesystem) DirectorySize(dir string) (int64, error) {
 	}
 
 	var size int64
-	var st syscall.Stat_t
+	// var st syscall.Stat_t
 
-	err = godirwalk.Walk(d, &godirwalk.Options{
-		Unsorted: true,
-		Callback: func(p string, e *godirwalk.Dirent) error {
-			// If this is a symlink then resolve the final destination of it before trying to continue walking
-			// over its contents. If it resolves outside the server data directory just skip everything else for
-			// it. Otherwise, allow it to continue.
-			if e.IsSymlink() {
-				if _, err := fs.SafePath(p); err != nil {
-					if IsErrorCode(err, ErrCodePathResolution) {
-						return godirwalk.SkipThis
-					}
+	// err = godirwalk.Walk(d, &godirwalk.Options{
+	// 	Unsorted: true,
+	// 	Callback: func(p string, e *godirwalk.Dirent) error {
+	// 		// If this is a symlink then resolve the final destination of it before trying to continue walking
+	// 		// over its contents. If it resolves outside the server data directory just skip everything else for
+	// 		// it. Otherwise, allow it to continue.
+	// 		if e.IsSymlink() {
+	// 			if _, err := fs.SafePath(p); err != nil {
+	// 				if IsErrorCode(err, ErrCodePathResolution) {
+	// 					return godirwalk.SkipThis
+	// 				}
 
-					return err
-				}
-			}
+	// 				return err
+	// 			}
+	// 		}
 
-			if !e.IsDir() {
-				syscall.Lstat(p, &st)
-				atomic.AddInt64(&size, st.Size)
-			}
+	// 		if !e.IsDir() {
+	// 			syscall.Lstat(p, &st)
+	// 			atomic.AddInt64(&size, st.Size)
+	// 		}
 
-			return nil
-		},
+	// 		return nil
+	// 	},
+	// })
+
+	err = filepath.Walk(d, func(_ string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() {
+			size += info.Size()
+		}
+		return err
 	})
 
 	return size, err

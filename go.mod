@@ -32,6 +32,7 @@ require (
 	github.com/gammazero/workerpool v1.0.0
 	github.com/gbrlsnchs/jwt/v3 v3.0.0-rc.2
 	github.com/gin-gonic/gin v1.6.3
+	github.com/go-delve/delve v1.5.1 // indirect
 	github.com/go-playground/validator/v10 v10.3.0 // indirect
 	github.com/gogo/protobuf v1.3.1 // indirect
 	github.com/google/uuid v1.1.1

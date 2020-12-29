@@ -1,12 +1,7 @@
 package config
 
 import (
-	"emperror.dev/errors"
 	"fmt"
-	"github.com/cobaugh/osrelease"
-	"github.com/creasty/defaults"
-	"github.com/gbrlsnchs/jwt/v3"
-	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -14,6 +9,12 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+
+	"emperror.dev/errors"
+	"github.com/cobaugh/osrelease"
+	"github.com/creasty/defaults"
+	"github.com/gbrlsnchs/jwt/v3"
+	"gopkg.in/yaml.v2"
 )
 
 const DefaultLocation = "/etc/pterodactyl/config.yml"
@@ -224,6 +225,8 @@ func (c *Configuration) GetPath() string {
 // mount points.
 func (c *Configuration) EnsurePterodactylUser() (*user.User, error) {
 	u, err := user.Lookup(c.System.Username)
+
+	fmt.Print(u, "\n", err, "\n\n")
 
 	// If an error is returned but it isn't the unknown user error just abort
 	// the process entirely. If we did find a user, return it immediately.
