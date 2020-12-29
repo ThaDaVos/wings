@@ -22,7 +22,7 @@ import (
 type Filesystem struct {
 	mu                sync.RWMutex
 	lastLookupTime    *usageLookupTime
-	lookupInProgress  system.AtomicBool
+	lookupInProgress  *system.AtomicBool
 	diskUsed          int64
 	diskCheckInterval time.Duration
 
@@ -42,6 +42,7 @@ func New(root string, size int64) *Filesystem {
 		diskLimit:         size,
 		diskCheckInterval: time.Duration(config.Get().System.DiskCheckInterval),
 		lastLookupTime:    &usageLookupTime{},
+		lookupInProgress:  system.NewAtomicBool(false),
 	}
 }
 
@@ -50,29 +51,36 @@ func (fs *Filesystem) Path() string {
 	return fs.root
 }
 
+// Returns a reader for a file instance.
+func (fs *Filesystem) File(p string) (*os.File, os.FileInfo, error) {
+	cleaned, err := fs.SafePath(p)
+	if err != nil {
+		return nil, nil, err
+	}
+	st, err := os.Stat(cleaned)
+	if err != nil {
+		return nil, nil, err
+	}
+	if st.IsDir() {
+		return nil, nil, &Error{code: ErrCodeIsDirectory}
+	}
+	f, err := os.Open(cleaned)
+	if err != nil {
+		return nil, nil, err
+	}
+	return f, st, nil
+}
+
 // Reads a file on the system and returns it as a byte representation in a file
 // reader. This is not the most memory efficient usage since it will be reading the
 // entirety of the file into memory.
 func (fs *Filesystem) Readfile(p string, w io.Writer) error {
-	cleaned, err := fs.SafePath(p)
+	file, _, err := fs.File(p)
 	if err != nil {
 		return err
 	}
-
-	if st, err := os.Stat(cleaned); err != nil {
-		return err
-	} else if st.IsDir() {
-		return &Error{code: ErrCodeIsDirectory}
-	}
-
-	f, err := os.Open(cleaned)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	_, err = bufio.NewReader(f).WriteTo(w)
-
+	defer file.Close()
+	_, err = bufio.NewReader(file).WriteTo(w)
 	return err
 }
 
@@ -256,7 +264,7 @@ func (fs *Filesystem) Chmod(path string, mode os.FileMode) error {
 // looping endlessly.
 func (fs *Filesystem) findCopySuffix(dir string, name string, extension string) (string, error) {
 	var i int
-	var suffix = " copy"
+	suffix := " copy"
 
 	for i = 0; i < 51; i++ {
 		if i > 0 {

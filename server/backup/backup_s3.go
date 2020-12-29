@@ -1,10 +1,9 @@
 package backup
 
 import (
-	"context"
 	"fmt"
-	"github.com/apex/log"
 	"github.com/pterodactyl/wings/api"
+	"github.com/pterodactyl/wings/server/filesystem"
 	"io"
 	"net/http"
 	"os"
@@ -17,19 +16,31 @@ type S3Backup struct {
 
 var _ BackupInterface = (*S3Backup)(nil)
 
+// Removes a backup from the system.
+func (s *S3Backup) Remove() error {
+	return os.Remove(s.Path())
+}
+
+// Attaches additional context to the log output for this backup.
+func (s *S3Backup) WithLogContext(c map[string]interface{}) {
+	s.logContext = c
+}
+
 // Generates a new backup on the disk, moves it into the S3 bucket via the provided
 // presigned URL, and then deletes the backup from the disk.
-func (s *S3Backup) Generate(included *IncludedFiles, prefix string) (*ArchiveDetails, error) {
+func (s *S3Backup) Generate(basePath, ignore string) (*ArchiveDetails, error) {
 	defer s.Remove()
 
-	a := &Archive{
-		TrimPrefix: prefix,
-		Files:      included,
+	a := &filesystem.Archive{
+		BasePath: basePath,
+		Ignore:   ignore,
 	}
 
-	if err := a.Create(s.Path(), context.Background()); err != nil {
+	s.log().Info("creating backup for server...")
+	if err := a.Create(s.Path()); err != nil {
 		return nil, err
 	}
+	s.log().Info("created backup successfully")
 
 	rc, err := os.Open(s.Path())
 	if err != nil {
@@ -42,11 +53,6 @@ func (s *S3Backup) Generate(included *IncludedFiles, prefix string) (*ArchiveDet
 	}
 
 	return s.Details(), nil
-}
-
-// Removes a backup from the system.
-func (s *S3Backup) Remove() error {
-	return os.Remove(s.Path())
 }
 
 // Reader provides a wrapper around an existing io.Reader
@@ -63,22 +69,20 @@ func (Reader) Close() error {
 func (s *S3Backup) generateRemoteRequest(rc io.ReadCloser) error {
 	defer rc.Close()
 
+	s.log().Debug("attempting to get size of backup...")
 	size, err := s.Backup.Size()
 	if err != nil {
 		return err
 	}
+	s.log().WithField("size", size).Debug("got size of backup")
 
+	s.log().Debug("attempting to get S3 upload urls from Panel...")
 	urls, err := api.New().GetBackupRemoteUploadURLs(s.Backup.Uuid, size)
 	if err != nil {
 		return err
 	}
-
-	l := log.WithFields(log.Fields{
-		"backup_id": s.Uuid,
-		"adapter":   "s3",
-	})
-
-	l.Info("attempting to upload backup..")
+	s.log().Debug("got S3 upload urls from the Panel")
+	s.log().WithField("parts", len(urls.Parts)).Info("attempting to upload backup to s3 endpoint...")
 
 	handlePart := func(part string, size int64) (string, error) {
 		r, err := http.NewRequest(http.MethodPut, part, nil)
@@ -111,11 +115,10 @@ func (s *S3Backup) generateRemoteRequest(rc io.ReadCloser) error {
 		return res.Header.Get("ETag"), nil
 	}
 
-	partCount := len(urls.Parts)
 	for i, part := range urls.Parts {
 		// Get the size for the current part.
 		var partSize int64
-		if i+1 < partCount {
+		if i+1 < len(urls.Parts) {
 			partSize = urls.PartSize
 		} else {
 			// This is the remaining size for the last part,
@@ -125,12 +128,14 @@ func (s *S3Backup) generateRemoteRequest(rc io.ReadCloser) error {
 
 		// Attempt to upload the part.
 		if _, err := handlePart(part, partSize); err != nil {
-			l.WithField("part_id", part).WithError(err).Warn("failed to upload part")
+			s.log().WithField("part_id", i+1).WithError(err).Warn("failed to upload part")
 			return err
 		}
+
+		s.log().WithField("part_id", i+1).Info("successfully uploaded backup part")
 	}
 
-	l.Info("backup has been successfully uploaded")
+	s.log().WithField("parts", len(urls.Parts)).Info("backup has been successfully uploaded")
 
 	return nil
 }

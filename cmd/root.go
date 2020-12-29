@@ -66,7 +66,7 @@ func init() {
 
 // Get the configuration path based on the arguments provided.
 func readConfiguration() (*config.Configuration, error) {
-	var p = configPath
+	p := configPath
 	if !strings.HasPrefix(p, "/") {
 		d, err := os.Getwd()
 		if err != nil {
@@ -356,6 +356,12 @@ func rootCmdRun(*cobra.Command, []string) {
 	if err := s.ListenAndServe(); err != nil {
 		log.WithField("error", err).Fatal("failed to configure HTTP server")
 	}
+
+	// Cancel the context on all of the running servers at this point, even though the
+	// program is just shutting down.
+	for _, s := range server.GetServers().All() {
+		s.CtxCancel()
+	}
 }
 
 // Execute calls cobra to handle cli commands
@@ -402,7 +408,7 @@ __ [blue][bold]Pterodactyl[reset] _____/___/_______ _______ ______
         \___/\___/___/___/___/___    /______/
                             /_______/ [bold]v%s[reset]
 
-Copyright © 2018 - 2020 Dane Everitt & Contributors
+Copyright © 2018 - 2021 Dane Everitt & Contributors
 
 Website:  https://pterodactyl.io
  Source:  https://github.com/pterodactyl/wings

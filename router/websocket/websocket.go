@@ -28,6 +28,7 @@ const (
 	PermissionSendPowerRestart = "control.restart"
 	PermissionReceiveErrors    = "admin.websocket.errors"
 	PermissionReceiveInstall   = "admin.websocket.install"
+	PermissionReceiveTransfer  = "admin.websocket.transfer"
 	PermissionReceiveBackups   = "backup.read"
 )
 
@@ -83,19 +84,11 @@ func GetHandler(s *server.Server, w http.ResponseWriter, r *http.Request) (*Hand
 			if o == config.Get().PanelLocation {
 				return true
 			}
-
 			for _, origin := range config.Get().AllowedOrigins {
-				if origin == "*" {
+				if origin == "*" || origin == o {
 					return true
 				}
-
-				if o != origin {
-					continue
-				}
-
-				return true
 			}
-
 			return false
 		},
 	}
@@ -146,6 +139,13 @@ func (h *Handler) SendJson(v *Message) error {
 		// them over the socket.
 		if strings.HasPrefix(v.Event, server.BackupCompletedEvent) {
 			if !j.HasPermission(PermissionReceiveBackups) {
+				return nil
+			}
+		}
+
+		// If we are sending transfer output, only send it to the user if they have the required permissions.
+		if v.Event == server.TransferLogsEvent {
+			if !j.HasPermission(PermissionReceiveTransfer) {
 				return nil
 			}
 		}
@@ -320,13 +320,15 @@ func (h *Handler) HandleInbound(m Message) error {
 			// Only send the current disk usage if the server is offline, if docker container is running,
 			// Environment#EnableResourcePolling() will send this data to all clients.
 			if state == environment.ProcessOfflineState {
-				_ = h.server.Filesystem().HasSpaceAvailable(false)
+				if !h.server.IsInstalling() && !h.server.IsTransferring() {
+					_ = h.server.Filesystem().HasSpaceAvailable(false)
 
-				b, _ := json.Marshal(h.server.Proc())
-				h.SendJson(&Message{
-					Event: server.StatsEvent,
-					Args:  []string{string(b)},
-				})
+					b, _ := json.Marshal(h.server.Proc())
+					h.SendJson(&Message{
+						Event: server.StatsEvent,
+						Args:  []string{string(b)},
+					})
+				}
 			}
 
 			return nil

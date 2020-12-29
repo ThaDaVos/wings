@@ -22,7 +22,7 @@ import (
 
 // Returns the contents of a file on the server.
 func getServerFileContents(c *gin.Context) {
-	s := GetServer(c.Param("server"))
+	s := ExtractServer(c)
 	f, err := url.QueryUnescape(c.Query("file"))
 	if err != nil {
 		WithError(c, err)
@@ -31,7 +31,7 @@ func getServerFileContents(c *gin.Context) {
 	p := "/" + strings.TrimLeft(f, "/")
 	st, err := s.Filesystem().Stat(p)
 	if err != nil {
-		NewServerError(err, s).AbortFilesystemError(c)
+		WithError(c, err)
 		return
 	}
 
@@ -55,9 +55,10 @@ func getServerFileContents(c *gin.Context) {
 	// happen since we're doing so much before this point that would normally throw an error if there
 	// was a problem with the file.
 	if err := s.Filesystem().Readfile(p, c.Writer); err != nil {
-		NewServerError(err, s).AbortFilesystemError(c)
+		WithError(c, err)
 		return
 	}
+	c.Writer.Flush()
 }
 
 // Returns the contents of a directory for a server.
@@ -271,6 +272,13 @@ func postServerPullRemoteFile(c *gin.Context) {
 		WithError(c, err)
 		return
 	}
+	// Do not allow more than three simultaneous remote file downloads at one time.
+	if len(downloader.ByServer(s.Id())) >= 3 {
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{
+			"error": "This server has reached its limit of 3 simultaneous remote file downloads at once. Please wait for one to complete before trying again.",
+		})
+		return
+	}
 
 	dl := downloader.New(s, downloader.DownloadRequest{
 		URL:       u,
@@ -433,6 +441,8 @@ type chmodFile struct {
 	Mode string `json:"mode"`
 }
 
+var errInvalidFileMode = errors.New("invalid file mode")
+
 func postServerChmodFile(c *gin.Context) {
 	s := GetServer(c.Param("server"))
 
@@ -464,7 +474,7 @@ func postServerChmodFile(c *gin.Context) {
 			default:
 				mode, err := strconv.ParseUint(p.Mode, 8, 32)
 				if err != nil {
-					return err
+					return errInvalidFileMode
 				}
 
 				if err := s.Filesystem().Chmod(path.Join(data.Root, p.File), os.FileMode(mode)); err != nil {
@@ -483,6 +493,13 @@ func postServerChmodFile(c *gin.Context) {
 	}
 
 	if err := g.Wait(); err != nil {
+		if errors.Is(err, errInvalidFileMode) {
+			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{
+				"error": "Invalid file mode.",
+			})
+			return
+		}
+
 		NewServerError(err, s).AbortFilesystemError(c)
 		return
 	}

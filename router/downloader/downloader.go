@@ -108,8 +108,13 @@ func (dl *Download) Execute() error {
 	dl.cancelFunc = &cancel
 	defer dl.Cancel()
 
-	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, dl.req.URL.String(), nil)
-	res, err := client.Do(req)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, dl.req.URL.String(), nil)
+	if err != nil {
+		return errors.WrapIf(err, "downloader: failed to create request")
+	}
+
+	req.Header.Set("User-Agent", "Pterodactyl Panel (https://pterodactyl.io)")
+	res, err := client.Do(req) // lgtm [go/request-forgery]
 	if err != nil {
 		return errors.New("downloader: failed opening request to download file")
 	}
