@@ -2,9 +2,10 @@ package environment
 
 import (
 	"context"
-	"github.com/apex/log"
 	"strconv"
 	"sync"
+
+	"github.com/apex/log"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/network"
@@ -66,9 +67,9 @@ func ConfigureDocker(c *config.DockerConfiguration) error {
 // Creates a new network on the machine if one does not exist already.
 func createDockerNetwork(cli *client.Client, c *config.DockerConfiguration) error {
 	_, err := cli.NetworkCreate(context.Background(), c.Network.Name, types.NetworkCreate{
-		Driver:     c.Network.Driver,
-		EnableIPv6: true,
-		Internal:   c.Network.IsInternal,
+		Driver: c.Network.Driver,
+		// EnableIPv6: true,
+		Internal: c.Network.IsInternal,
 		IPAM: &network.IPAM{
 			Config: []network.IPAMConfig{
 				{
