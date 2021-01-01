@@ -166,9 +166,9 @@ func (e *Environment) Create() error {
 	}
 
 	conf := &container.Config{
-		Hostname:     e.Id,
-		Domainname:   config.Get().Docker.Domainname,
-		User:         strconv.Itoa(config.Get().System.User.Uid),
+		Hostname:   e.Id,
+		Domainname: config.Get().Docker.Domainname,
+		// User:         strconv.Itoa(config.Get().System.User.Uid),
 		AttachStdin:  true,
 		AttachStdout: true,
 		AttachStderr: true,
@@ -217,7 +217,7 @@ func (e *Environment) Create() error {
 			},
 		},
 
-		SecurityOpt:    []string{"no-new-privileges:true"},
+		// SecurityOpt:    []string{"no-new-privileges:true"},
 		ReadonlyRootfs: false,
 		CapDrop: []string{
 			"setpcap", "mknod", "audit_write", "net_raw", "dac_override",
