@@ -2,9 +2,7 @@ package config
 
 import (
 	"context"
-	"emperror.dev/errors"
 	"fmt"
-	"github.com/apex/log"
 	"html/template"
 	"io/ioutil"
 	"os"
@@ -13,6 +11,9 @@ import (
 	"path/filepath"
 	"regexp"
 	"time"
+
+	"emperror.dev/errors"
+	"github.com/apex/log"
 )
 
 // Defines basic system configuration settings.
@@ -45,8 +46,8 @@ type SystemConfiguration struct {
 	// Definitions for the user that gets created to ensure that we can quickly access
 	// this information without constantly having to do a system lookup.
 	User struct {
-		Uid int
-		Gid int
+		Uid string
+		Gid string
 	}
 
 	// The amount of time in seconds that can elapse before a server's disk space calculation is

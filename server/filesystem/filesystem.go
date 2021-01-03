@@ -2,11 +2,6 @@ package filesystem
 
 import (
 	"bufio"
-	"emperror.dev/errors"
-	"github.com/gabriel-vasile/mimetype"
-	"github.com/karrick/godirwalk"
-	"github.com/pterodactyl/wings/config"
-	"github.com/pterodactyl/wings/system"
 	"io"
 	"io/ioutil"
 	"os"
@@ -17,6 +12,12 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"emperror.dev/errors"
+	"github.com/gabriel-vasile/mimetype"
+	"github.com/karrick/godirwalk"
+	"github.com/pterodactyl/wings/config"
+	"github.com/pterodactyl/wings/system"
 )
 
 type Filesystem struct {
@@ -202,8 +203,8 @@ func (fs *Filesystem) Chown(path string) error {
 		return nil
 	}
 
-	uid := config.Get().System.User.Uid
-	gid := config.Get().System.User.Gid
+	uid, _ := strconv.Atoi(config.Get().System.User.Uid)
+	gid, _ := strconv.Atoi(config.Get().System.User.Gid)
 
 	// Start by just chowning the initial path that we received.
 	if err := os.Chown(cleaned, uid, gid); err != nil {

@@ -1,6 +1,8 @@
 package sftp
 
 import (
+	"strconv"
+
 	"emperror.dev/errors"
 	"github.com/apex/log"
 	"github.com/pterodactyl/wings/api"
@@ -11,10 +13,13 @@ import (
 var noMatchingServerError = errors.New("no matching server with that UUID was found")
 
 func Initialize(config config.SystemConfiguration) error {
+	uid, _ := strconv.Atoi(config.User.Uid)
+	gid, _ := strconv.Atoi(config.User.Gid)
+
 	s := &Server{
 		User: User{
-			Uid: config.User.Uid,
-			Gid: config.User.Gid,
+			Uid: uid,
+			Gid: gid,
 		},
 		Settings: Settings{
 			BasePath:    config.Data,

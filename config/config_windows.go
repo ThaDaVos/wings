@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/exec"
 	"os/user"
-	"strconv"
 	"strings"
 	"sync"
 
@@ -14,6 +13,7 @@ import (
 	"github.com/cobaugh/osrelease"
 	"github.com/creasty/defaults"
 	"github.com/gbrlsnchs/jwt/v3"
+	"golang.org/x/sys/windows"
 	"gopkg.in/yaml.v2"
 )
 
@@ -230,30 +230,14 @@ func (c *Configuration) EnsurePterodactylUser() (*user.User, error) {
 
 	// If an error is returned but it isn't the unknown user error just abort
 	// the process entirely. If we did find a user, return it immediately.
+	// golang.org.x/sys/windows.ERROR_NONE_MAPPED (1332)
 	if err == nil {
 		return u, c.setSystemUser(u)
-	} else if _, ok := err.(user.UnknownUserError); !ok {
+	} else if err != windows.ERROR_NONE_MAPPED {
 		return nil, err
 	}
 
-	sysName, err := getSystemName()
-	if err != nil {
-		return nil, err
-	}
-
-	command := fmt.Sprintf("useradd --system --no-create-home --shell /bin/false %s", c.System.Username)
-
-	// Alpine Linux is the only OS we currently support that doesn't work with the useradd command, so
-	// in those cases we just modify the command a bit to work as expected.
-	if strings.HasPrefix(sysName, "alpine") {
-		command = fmt.Sprintf("adduser -S -D -H -G %[1]s -s /bin/false %[1]s", c.System.Username)
-
-		// We have to create the group first on Alpine, so do that here before continuing on
-		// to the user creation process.
-		if _, err := exec.Command("addgroup", "-S", c.System.Username).Output(); err != nil {
-			return nil, err
-		}
-	}
+	command := fmt.Sprintf("net user %s /add", c.System.Username)
 
 	split := strings.Split(command, " ")
 	if _, err := exec.Command(split[0], split[1:]...).Output(); err != nil {
@@ -270,13 +254,10 @@ func (c *Configuration) EnsurePterodactylUser() (*user.User, error) {
 // Set the system user into the configuration and then write it to the disk so that
 // it is persisted on boot.
 func (c *Configuration) setSystemUser(u *user.User) error {
-	uid, _ := strconv.Atoi(u.Uid)
-	gid, _ := strconv.Atoi(u.Gid)
-
 	c.Lock()
-	c.System.Username = u.Username
-	c.System.User.Uid = uid
-	c.System.User.Gid = gid
+	c.System.Username = strings.Split(u.Username, "\\")[1]
+	c.System.User.Uid = u.Uid
+	c.System.User.Gid = u.Gid
 	c.Unlock()
 
 	return c.WriteToDisk()
