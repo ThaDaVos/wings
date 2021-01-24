@@ -215,7 +215,7 @@ func (ip *InstallationProcess) writeScriptToDisk() error {
 		return errors.WithMessage(err, "could not create temporary directory for install process")
 	}
 
-	f, err := os.OpenFile(filepath.Join(ip.tempDir(), "install.sh"), os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
+	f, err := os.OpenFile(filepath.Join(ip.tempDir(), "install.ps1"), os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
 		return errors.WithMessage(err, "failed to write server installation script to disk before mount")
 	}
@@ -408,13 +408,14 @@ func (ip *InstallationProcess) Execute() (string, error) {
 		AttachStdin:  true,
 		OpenStdin:    true,
 		Tty:          true,
-		Cmd:          []string{ip.Script.Entrypoint, "/mnt/install/install.sh"},
+		Cmd:          []string{ip.Script.Entrypoint, "C:\\Pterodactyl-Install\\install.ps1"},
 		Image:        ip.Script.ContainerImage,
 		Env:          ip.Server.GetEnvironmentVariables(),
 		Labels: map[string]string{
 			"Service":       "Pterodactyl",
 			"ContainerType": "server_installer",
 		},
+		User: "NT Authority\\System",
 	}
 
 	tmpfsSize := strconv.Itoa(int(config.Get().Docker.TmpfsSize))
@@ -445,10 +446,11 @@ func (ip *InstallationProcess) Execute() (string, error) {
 				"compress": "false",
 			},
 		},
+		// Privileged:  true, // Not supported on Windows
 		NetworkMode: container.NetworkMode(config.Get().Docker.Network.Mode),
 	}
 
-	ip.Server.Log().WithField("install_script", ip.tempDir()+"/install.sh").Info("creating install container for server process")
+	ip.Server.Log().WithField("install_script", ip.tempDir()+"/install.ps1").Info("creating install container for server process")
 	// Remove the temporary directory when the installation process finishes for this server container.
 	defer func() {
 		if err := os.RemoveAll(ip.tempDir()); err != nil {

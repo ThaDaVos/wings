@@ -95,8 +95,8 @@ func (e *Environment) resources() container.Resources {
 
 	return container.Resources{
 		Memory:            l.BoundedMemoryLimit(),
-		MemoryReservation: l.MemoryLimit * 1_000_000,
-		MemorySwap:        l.ConvertedSwap(),
+		// MemoryReservation: l.MemoryLimit * 1_000_000, // Not supported on Windows
+		// MemorySwap:        l.ConvertedSwap(), // Not supported on Windows
 		CPUQuota:          l.ConvertedCpuLimit(),
 		// CPUPeriod:         100_000, // Not supported on Windows
 		CPUShares: 1024,
