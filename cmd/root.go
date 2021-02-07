@@ -2,8 +2,14 @@ package cmd
 
 import (
 	"crypto/tls"
-	"emperror.dev/errors"
 	"fmt"
+	"net/http"
+	"os"
+	"path"
+	"path/filepath"
+	"strings"
+
+	"emperror.dev/errors"
 	"github.com/NYTimes/logrotate"
 	"github.com/apex/log"
 	"github.com/apex/log/handlers/multi"
@@ -21,11 +27,6 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/crypto/acme"
 	"golang.org/x/crypto/acme/autocert"
-	"net/http"
-	"os"
-	"path"
-	"path/filepath"
-	"strings"
 )
 
 var (
@@ -66,14 +67,10 @@ func init() {
 
 // Get the configuration path based on the arguments provided.
 func readConfiguration() (*config.Configuration, error) {
-	p := configPath
-	if !strings.HasPrefix(p, "/") {
-		d, err := os.Getwd()
-		if err != nil {
-			return nil, err
-		}
+	p, err := config.ParsePath(configPath)
 
-		p = path.Clean(path.Join(d, configPath))
+	if err != nil {
+		return nil, err
 	}
 
 	if s, err := os.Stat(p); err != nil {

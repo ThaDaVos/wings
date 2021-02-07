@@ -6,6 +6,8 @@ import (
 	"os"
 	"os/exec"
 	"os/user"
+	"path"
+	"regexp"
 	"strings"
 	"sync"
 
@@ -17,7 +19,8 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-const DefaultLocation = "/etc/pterodactyl/config.yml"
+const DefaultLocation = "C:\\ProgramData\\Pterodactyl\\config.yml"
+const PathValidationRegex = `(?m)^[a-zA-Z]:\\`
 
 type Configuration struct {
 	sync.RWMutex `json:"-" yaml:"-"`
@@ -116,6 +119,22 @@ type RemoteQueryConfiguration struct {
 	// 50 servers is likely just as quick as two for 100 or one for 400, and will certainly
 	// be less likely to cause performance issues on the Panel.
 	BootServersPerPage uint `default:"50" yaml:"boot_servers_per_page"`
+}
+
+// Parses the path and pre-fixes it with current working directory if needed
+func ParsePath(p string) (string, error) {
+	var re = regexp.MustCompile(PathValidationRegex)
+
+	if !re.MatchString(p) {
+		d, err := os.Getwd()
+		if err != nil {
+			return p, err
+		}
+
+		p = path.Clean(path.Join(d, p))
+	}
+
+	return p, nil
 }
 
 // Reads the configuration from the provided file and returns the configuration

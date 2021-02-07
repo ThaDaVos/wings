@@ -1,5 +1,7 @@
 # escape=`
-FROM mcr.microsoft.com/windows/servercore:20H2
+ARG VERSION=20H2
+
+FROM mcr.microsoft.com/windows/servercore:${VERSION}
 
 RUN powershell; `
     Invoke-WebRequest -OutFile $env:TEMP\NDP461-KB3102436-x86-x64-AllOS-ENU.exe https://go.microsoft.com/fwlink/?LinkId=2099467; `
