@@ -245,8 +245,6 @@ func (c *Configuration) GetPath() string {
 func (c *Configuration) EnsurePterodactylUser() (*user.User, error) {
 	u, err := user.Lookup(c.System.Username)
 
-	fmt.Print(u, "\n", err, "\n\n")
-
 	// If an error is returned but it isn't the unknown user error just abort
 	// the process entirely. If we did find a user, return it immediately.
 	// golang.org.x/sys/windows.ERROR_NONE_MAPPED (1332)

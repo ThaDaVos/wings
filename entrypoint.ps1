@@ -1,6 +1,10 @@
 function Coalesce($a, $b) { if ($null -ne $a) { $a } else { $b } };
 New-Alias "??" Coalesce;
 
+$startTime = Get-Date;
+
+Write-Host "Starting Space Engineers server at $startTime";
+
 $workdir = "C:\Container";
 
 Set-Location $workdir;
@@ -11,35 +15,42 @@ $ModifiedStartup = ($env:STARTUP).replace('{{', '$env:').replace('}}', '');
 #Run the server
 # Invoke-Expression $ModifiedStartup
 
-$oldlogs = ?? Get-ChildItem $workdir\*.log "";
-$serverJob = Start-Job { Invoke-Expression $ModifiedStartup } -Name "Space Engineers Dedicated Server";
+$script = [scriptblock]::create($ModifiedStartup);
+$serverJob = Start-Job -Name "Space Engineers Dedicated Server" -ScriptBlock $script;
 
-$global:running = $true;
+$running = $true;
 $jobEvent = Register-ObjectEvent $serverJob StateChanged -Action {
     $jobEvent | Unregister-Event;
-    $global:running = $false;
+    $script:running = $false;
 };
 
 Write-Host -NoNewline "Waiting for server to start.";
+$found = $false;
 DO {
     Write-Host -NoNewline ".";
-    $newlogs = ?? Get-ChildItem $workdir\*.log "";
-    $logFileCompare = Compare-Object -ReferenceObject $oldlogs -DifferenceObject $newlogs;
-    Start-Sleep -m 300;
-} Until ($logFileCompare -or ($global:running -ne $true))
+    $script:found = Test-Path "$workdir\SpaceEngineersDedicated*.log" -NewerThan $script:startTime;
+    Start-Sleep -Milliseconds 250;
+} Until (($found -eq $true) -or ($running -ne $true))
 
-if ($global:running -ne $true) {
+if ($running -ne $true) {
+    Receive-Job -Job $serverJob;
+
     if ($logFileCompare) {
         Write-Host "`nStopped";
+        Start-Sleep -Seconds 5;
+        Exit 0;
     } else {
         Write-Host "`nCrashed";
+        Start-Sleep -Seconds 5;
+        Exit -1;
     }
-    Exit 0;
+} else {
+    Write-Host "`nStarted";
 }
 
-Write-Host "`nStarted";
+$logfile = Get-ChildItem "$workdir\SpaceEngineersDedicated*.log" | Sort-Object -Property LastWriteTime | Select-Object -Last 1;
 
-$logfile = $logFileCompare.InputObject;
+Write-Host "Tailing generated log file: $logfile";
 Get-Content -Path $logfile -Wait;
 
 # If you see top-like output, something went wrong with the log tail

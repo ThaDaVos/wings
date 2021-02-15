@@ -37,6 +37,7 @@ require (
 	github.com/google/uuid v1.1.2
 	github.com/gorilla/mux v1.7.4 // indirect
 	github.com/gorilla/websocket v1.4.2
+	github.com/hectane/go-acl v0.0.0-20190604041725-da78bae5fc95
 	github.com/iancoleman/strcase v0.1.2
 	github.com/icza/dyno v0.0.0-20200205103839-49cb13720835
 	github.com/imdario/mergo v0.3.9

@@ -1,14 +1,17 @@
 package sftp
 
 import (
-	"github.com/apex/log"
-	"github.com/patrickmn/go-cache"
-	"github.com/pkg/sftp"
 	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sync"
+
+	"github.com/apex/log"
+	"github.com/hectane/go-acl"
+	"github.com/patrickmn/go-cache"
+	"github.com/pkg/sftp"
+	"golang.org/x/sys/windows"
 )
 
 type FileSystem struct {
@@ -36,6 +39,24 @@ const (
 	PermissionFileUpdate      = "file.update"
 	PermissionFileDelete      = "file.delete"
 )
+
+// Chown function to chown file
+func Chown(name string, uid, gid string) error {
+	sid, e := windows.StringToSid(uid)
+
+	if e != nil {
+		return e
+	}
+
+	if e := acl.Apply(
+		name,
+		false,
+		false,
+		acl.GrantSid(windows.GENERIC_ALL, sid)); e != nil {
+		return e
+	}
+	return nil
+}
 
 // Fileread creates a reader for a file on the system and returns the reader back.
 func (fs FileSystem) Fileread(request *sftp.Request) (io.ReaderAt, error) {
@@ -122,9 +143,9 @@ func (fs FileSystem) Filewrite(request *sftp.Request) (io.WriterAt, error) {
 		// Chown is not supported on Windows
 		// Not failing here is intentional. We still made the file, it is just owned incorrectly
 		// and will likely cause some issues.
-		//if err := os.Chown(p, fs.User.Uid, fs.User.Gid); err != nil {
-		//	l.WithField("error", err).Warn("failed to set owner on file")
-		//}
+		if err := Chown(p, fs.User.Uid, fs.User.Gid); err != nil {
+			l.WithField("error", err).Warn("failed to set owner on file")
+		}
 
 		return file, nil
 	}
@@ -165,9 +186,9 @@ func (fs FileSystem) Filewrite(request *sftp.Request) (io.WriterAt, error) {
 	// Chown is not supported on Windows
 	// Not failing here is intentional. We still made the file, it is just owned incorrectly
 	// and will likely cause some issues.
-	//if err := os.Chown(p, fs.User.Uid, fs.User.Gid); err != nil {
-	//	l.WithField("error", err).Warn("error chowning file")
-	//}
+	if err := Chown(p, fs.User.Uid, fs.User.Gid); err != nil {
+		l.WithField("error", err).Warn("error chowning file")
+	}
 
 	return file, nil
 }
@@ -215,7 +236,7 @@ func (fs FileSystem) Filecmd(request *sftp.Request) error {
 			mode = 0755
 		}
 
-		if err := os.Chmod(p, mode); err != nil {
+		if err := acl.Chmod(p, mode); err != nil {
 			if os.IsNotExist(err) {
 				return sftp.ErrSSHFxNoSuchFile
 			}
@@ -296,17 +317,17 @@ func (fs FileSystem) Filecmd(request *sftp.Request) error {
 		return sftp.ErrSshFxOpUnsupported
 	}
 	// Chown is not supported on Windows
-	//var fileLocation = p
-	//if target != "" {
-	//	fileLocation = target
-	//}
+	var fileLocation = p
+	if target != "" {
+		fileLocation = target
+	}
 
 	// Not failing here is intentional. We still made the file, it is just owned incorrectly
 	// and will likely cause some issues. There is no logical check for if the file was removed
 	// because both of those cases (Rmdir, Remove) have an explicit return rather than break.
-	//if err := os.Chown(fileLocation, fs.User.Uid, fs.User.Gid); err != nil {
-	//	l.WithField("error", err).Warn("error chowning file")
-	//}
+	if err := Chown(fileLocation, fs.User.Uid, fs.User.Gid); err != nil {
+		l.WithField("error", err).Warn("error chowning file")
+	}
 
 	return sftp.ErrSshFxOk
 }
